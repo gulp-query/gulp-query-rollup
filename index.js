@@ -1,11 +1,11 @@
 let Plugin = require('gulp-query').Plugin
   , node_path = require('path')
-  , file = require('gulp-file')
   , gulp = require('gulp')
   , rollup = require('rollup').rollup
   , buble = require('rollup-plugin-buble')
   , nodeResolve = require('rollup-plugin-node-resolve')
   , commonjs = require('rollup-plugin-commonjs')
+  , json = require('rollup-plugin-json')
   , uglify = require('rollup-plugin-uglify')
   , minify = require('uglify-es').minify
 
@@ -24,6 +24,7 @@ class RollupPlugin extends Plugin {
     let name = ('name' in config ? config['name'] : false);
     let moduleName = ('moduleName' in config ? config['moduleName'] : false);
     let full = ('full' in config ? config['full'] : false);
+    let format = ('format' in config ? config['format'] : 'iife');
     let path_to = this.path(config.to);
     let path_from = this.path(config.from);
 
@@ -47,7 +48,19 @@ class RollupPlugin extends Plugin {
       filename_to = node_path.basename(filename_from);
     }
 
+    if (!moduleName) {
+      if (name) {
+        moduleName = name;
+      } else {
+        moduleName = node_path.basename(filename_to, '.js');
+        moduleName = moduleName[0].toUpperCase() + moduleName.slice(1);
+      }
+    }
+
     let list = [];
+
+    list.push('module: ' + moduleName);
+    list.push('format: ' + format);
 
     if (sourceMap) {
       if (sourceMapType === true) {
@@ -64,15 +77,6 @@ class RollupPlugin extends Plugin {
     let _src = path_from + filename_from;
     let _dest = path_to + filename_to;
 
-    if (!moduleName) {
-      if (name) {
-        moduleName = name;
-      } else {
-        moduleName = node_path.basename(filename_to, '.js');
-        moduleName = moduleName[0].toUpperCase() + moduleName.slice(1);
-      }
-    }
-
     return rollup({
       input: _src,
       plugins: [
@@ -83,6 +87,7 @@ class RollupPlugin extends Plugin {
             path_from + '**'
           ]
         }),
+        json(),
         buble()
         , this.isProduction() && uglify({}, minify)
       ],
@@ -92,7 +97,7 @@ class RollupPlugin extends Plugin {
         cache = bundle;
 
         bundle.write({
-          format: 'iife',
+          format: format,
           file: _dest,
           sourcemap: sourceMap ? sourceMapType : false,
           name: moduleName
