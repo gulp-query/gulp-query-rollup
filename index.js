@@ -7,7 +7,7 @@ let Plugin = require('gulp-query').Plugin
   , nodeResolve = require('rollup-plugin-node-resolve')
   , commonjs = require('rollup-plugin-commonjs')
   , uglify = require('rollup-plugin-uglify')
-  , minify  = require('uglify-es').minify
+  , minify = require('uglify-es').minify
 
 ;
 
@@ -28,6 +28,9 @@ class RollupPlugin extends Plugin {
     let path_from = this.path(config.from);
 
     let sourceMap = ('source_map' in config ? config['source_map'] : true);
+    let sourceMapType = ('source_map_type' in config ? config['source_map_type'] : 'inline');
+    sourceMapType = sourceMapType === 'inline' ? 'inline' : true;
+
     if (this.isProduction()) {
       sourceMap = false;
     }
@@ -47,7 +50,11 @@ class RollupPlugin extends Plugin {
     let list = [];
 
     if (sourceMap) {
-      list.push('Source map');
+      if (sourceMapType === true) {
+        list.push('Source map: file');
+      } else {
+        list.push('Source map: inline');
+      }
     }
 
     if (this.isProduction() && !full) {
@@ -70,12 +77,12 @@ class RollupPlugin extends Plugin {
       input: _src,
       plugins: [
         nodeResolve({browser: true, main: true, jsnext: true}),
-        // commonjs({
-        //   include: [
-        //     'node_modules/**',
-        //     path_from + '**'
-        //   ]
-        // }),
+        commonjs({
+          include: [
+            'node_modules/**',
+            path_from + '**'
+          ]
+        }),
         buble()
         , this.isProduction() && uglify({}, minify)
       ],
@@ -83,19 +90,16 @@ class RollupPlugin extends Plugin {
     })
       .then((bundle) => {
         cache = bundle;
-        return bundle.generate({
+
+        bundle.write({
           format: 'iife',
-          sourcemap: sourceMap,
+          file: _dest,
+          sourcemap: sourceMap ? sourceMapType : false,
           name: moduleName
         });
-      })
-      .then((result) => {
-        return file(filename_to, result.code, {src: true})
-          .pipe(gulp.dest(path_to))
-          .pipe(this.notify(this.report.bind(this, task_name, _src, _dest, true, list)))
-      })
-      ;
 
+        this.report(task_name, _src, _dest, true, list);
+      });
   }
 }
 
